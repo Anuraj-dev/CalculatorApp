@@ -40,6 +40,7 @@ import com.example.calculatorapp.ui.ConstantsLibraryDialog
 import com.example.calculatorapp.ui.UnitConverterDialog
 import com.example.calculatorapp.utils.AdvancedMath
 import com.example.calculatorapp.utils.ScientificConstants
+import com.example.calculatorapp.ui.HistoryDialog
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,15 +69,58 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isDegreeMode by remember { mutableStateOf(true) }
     var showFraction by remember { mutableStateOf(false) }
-    var calculationHistory by remember { mutableStateOf(listOf<Pair<String, String>>()) }
-    // Add flag to track when the last action was equals
     var lastActionWasEquals by remember { mutableStateOf(false) }
+    
+    // Use the CalculatorModel for memory and history management
     val calculatorModel = remember { CalculatorModel() }
 
     // Dialog visibility states
     var showUnitConverter by remember { mutableStateOf(false) }
     var showConstantsLibrary by remember { mutableStateOf(false) }
     var showHistory by remember { mutableStateOf(false) }
+    
+    // Show dialogs when needed
+    if (showUnitConverter) {
+        UnitConverterDialog(
+            onDismiss = { showUnitConverter = false },
+            onValueCalculated = { value ->
+                if (lastActionWasEquals || input.isEmpty()) {
+                    input = value
+                } else {
+                    input += value
+                }
+                lastActionWasEquals = false
+            }
+        )
+    }
+    
+    if (showConstantsLibrary) {
+        ConstantsLibraryDialog(
+            onDismiss = { showConstantsLibrary = false },
+            onConstantSelected = { value ->
+                if (lastActionWasEquals || input.isEmpty()) {
+                    input = value.toString()
+                } else {
+                    input += value.toString()
+                }
+                lastActionWasEquals = false
+            }
+        )
+    }
+    
+    if (showHistory) {
+        HistoryDialog(
+            history = calculatorModel.calculationHistory,
+            onDismiss = { showHistory = false },
+            onClearHistory = { calculatorModel.clearHistory() },
+            onSelectCalculation = { expr, res ->
+                input = expr
+                result = res
+                rawResult = res.toDoubleOrNull()
+                lastActionWasEquals = true
+            }
+        )
+    }
     
     // Effect to update result format when fraction mode changes
     LaunchedEffect(showFraction, rawResult) {
@@ -252,9 +296,9 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
                         try {
                             rawResult = calculateExpression(input, isDegreeMode) // Store raw result
                             result = formatResult(rawResult!!, showFraction)
-                            // Add to history
+                            // Add to history using CalculatorModel
                             if (input.isNotEmpty()) {
-                                calculationHistory = calculationHistory + Pair(input, result)
+                                calculatorModel.addToHistory(input, result)
                             }
                             errorMessage = null
                             lastActionWasEquals = true // Set flag when equals is pressed

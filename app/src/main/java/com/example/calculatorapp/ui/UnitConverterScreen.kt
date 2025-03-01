@@ -15,6 +15,7 @@ import com.example.calculatorapp.utils.UnitConverter
 
 enum class UnitType { LENGTH, WEIGHT, TEMPERATURE }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UnitConverterDialog(
     onDismiss: () -> Unit,
@@ -26,6 +27,7 @@ fun UnitConverterDialog(
     var toUnit by remember { mutableStateOf("cm") }
     var result by remember { mutableStateOf("") }
     
+    // Define unit options based on type
     val lengthUnits = listOf("mm", "cm", "m", "km", "in", "ft", "yd", "mi")
     val weightUnits = listOf("mg", "g", "kg", "t", "oz", "lb", "st")
     val temperatureUnits = listOf("C", "F", "K")
@@ -37,11 +39,35 @@ fun UnitConverterDialog(
         UnitType.TEMPERATURE -> temperatureUnits
     }
     
+    // Dropdown expanded states
+    var fromDropdownExpanded by remember { mutableStateOf(false) }
+    var toDropdownExpanded by remember { mutableStateOf(false) }
+    
     // Update default unit selections when type changes
     LaunchedEffect(unitType) {
         fromUnit = currentUnits.first()
         toUnit = if (currentUnits.size > 1) currentUnits[1] else currentUnits.first()
         result = ""
+        // Reset input to avoid confusion with previous conversion
+        inputValue = ""
+    }
+    
+    // Calculate result when inputs change
+    fun calculateResult() {
+        try {
+            if (inputValue.isNotEmpty()) {
+                val value = inputValue.toDoubleOrNull() ?: return
+                result = when (unitType) {
+                    UnitType.LENGTH -> UnitConverter.convertLength(value, fromUnit, toUnit)
+                    UnitType.WEIGHT -> UnitConverter.convertWeight(value, fromUnit, toUnit)
+                    UnitType.TEMPERATURE -> UnitConverter.convertTemperature(value, fromUnit, toUnit)
+                }.toString()
+            } else {
+                result = ""
+            }
+        } catch (e: Exception) {
+            result = "Error: ${e.message}"
+        }
     }
     
     Dialog(onDismissRequest = onDismiss) {
@@ -82,21 +108,7 @@ fun UnitConverterDialog(
                     value = inputValue,
                     onValueChange = { 
                         inputValue = it 
-                        // Perform conversion when input changes
-                        try {
-                            if (inputValue.isNotEmpty()) {
-                                val value = inputValue.toDoubleOrNull() ?: return@OutlinedTextField
-                                result = when (unitType) {
-                                    UnitType.LENGTH -> UnitConverter.convertLength(value, fromUnit, toUnit)
-                                    UnitType.WEIGHT -> UnitConverter.convertWeight(value, fromUnit, toUnit)
-                                    UnitType.TEMPERATURE -> UnitConverter.convertTemperature(value, fromUnit, toUnit)
-                                }.toString()
-                            } else {
-                                result = ""
-                            }
-                        } catch (e: Exception) {
-                            result = "Error: ${e.message}"
-                        }
+                        calculateResult()
                     },
                     label = { Text("Value") },
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
@@ -116,30 +128,44 @@ fun UnitConverterDialog(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("From")
-                        DropdownMenu(
-                            expanded = false,
-                            onDismissRequest = { },
-                            modifier = Modifier.fillMaxWidth(0.9f)
-                        ) {
-                            // This is just a placeholder to show structure
-                        }
                         
-                        // Using an exposed dropdown menu would be better but simplifying for now
-                        OutlinedCard(
-                            modifier = Modifier.padding(top = 4.dp)
+                        // Exposed dropdown menu
+                        ExposedDropdownMenuBox(
+                            expanded = fromDropdownExpanded,
+                            onExpandedChange = { fromDropdownExpanded = !fromDropdownExpanded }
                         ) {
-                            DropdownMenuItem(
-                                text = { Text(fromUnit) },
-                                onClick = { },
-                                trailingIcon = { Text("▼", fontSize = 12.sp) }
+                            OutlinedTextField(
+                                value = fromUnit,
+                                onValueChange = {},
+                                readOnly = true,
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = fromDropdownExpanded) },
+                                modifier = Modifier.menuAnchor()
                             )
+                            
+                            ExposedDropdownMenu(
+                                expanded = fromDropdownExpanded,
+                                onDismissRequest = { fromDropdownExpanded = false }
+                            ) {
+                                currentUnits.forEach { unit ->
+                                    DropdownMenuItem(
+                                        text = { Text(unit) },
+                                        onClick = { 
+                                            fromUnit = unit
+                                            fromDropdownExpanded = false
+                                            calculateResult()
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                     
                     // Arrow indicator
                     Text(
                         text = "→",
-                        modifier = Modifier.align(Alignment.CenterVertically),
+                        modifier = Modifier
+                            .align(Alignment.CenterVertically)
+                            .padding(horizontal = 8.dp),
                         fontSize = 24.sp
                     )
                     
@@ -149,40 +175,62 @@ fun UnitConverterDialog(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("To")
-                        OutlinedCard(
-                            modifier = Modifier.padding(top = 4.dp)
+                        
+                        // Exposed dropdown menu
+                        ExposedDropdownMenuBox(
+                            expanded = toDropdownExpanded,
+                            onExpandedChange = { toDropdownExpanded = !toDropdownExpanded }
                         ) {
-                            DropdownMenuItem(
-                                text = { Text(toUnit) },
-                                onClick = { },
-                                trailingIcon = { Text("▼", fontSize = 12.sp) }
+                            OutlinedTextField(
+                                value = toUnit,
+                                onValueChange = {},
+                                readOnly = true,
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = toDropdownExpanded) },
+                                modifier = Modifier.menuAnchor()
                             )
+                            
+                            ExposedDropdownMenu(
+                                expanded = toDropdownExpanded,
+                                onDismissRequest = { toDropdownExpanded = false }
+                            ) {
+                                currentUnits.forEach { unit ->
+                                    DropdownMenuItem(
+                                        text = { Text(unit) },
+                                        onClick = { 
+                                            toUnit = unit
+                                            toDropdownExpanded = false
+                                            calculateResult()
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
                 
-                // Small note about how to pick units (in real implementation)
-                Text(
-                    text = "(Tap unit to change)",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
                 // Result display
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 ) {
-                    Text("Result:", style = MaterialTheme.typography.bodyLarge)
-                    
-                    if (result.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Text(
-                            text = "$result $toUnit",
+                            text = "Result",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Text(
+                            text = if (result.isNotEmpty()) "$result $toUnit" else "—",
                             style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -200,7 +248,7 @@ fun UnitConverterDialog(
                     
                     Button(
                         onClick = { 
-                            if (result.isNotEmpty()) {
+                            if (result.isNotEmpty() && !result.startsWith("Error")) {
                                 onValueCalculated(result)
                                 onDismiss()
                             }
