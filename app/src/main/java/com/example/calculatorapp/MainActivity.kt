@@ -96,9 +96,62 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
             ) {
                 Text(
                     text = if (isDegreeMode) "DEG" else "RAD",
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Switch(
+                    checked = isDegreeMode,
+                    onCheckedChange = { isDegreeMode = it }
+                )
+            }
+            
+            // Fraction/Decimal toggle
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Fraction",
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Switch(
+                    checked = showFraction,
+                    onCheckedChange = { showFraction = it }
+                )
+            }
+            
+            // Scientific mode toggle
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Scientific",
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Switch(
+                    checked = showScientific,
+                    onCheckedChange = { showScientific = it }
+                )
+            }
+        }
+
+        // Calculator keypad
+        CalculatorKeypad(
+            showScientific = showScientific,
+            onButtonClick = { button ->
+                when (button) {
+                    "=" -> {
+                        try {
+                            val calculatedResult = calculateExpression(input, isDegreeMode)
+                            result = formatResult(calculatedResult, showFraction)
+                            // Add to history
+                            if (input.isNotEmpty()) {
+                                calculationHistory = calculationHistory + Pair(input, result)
+                            }
                             errorMessage = null
+                        } catch (e: ArithmeticException) {
+                            errorMessage = "Error: Division by zero"
+                            result = ""
                         } catch (e: Exception) {
-                            errorMessage = "Error: ${e.message ?: "Unknown error"}"
+                            errorMessage = "Error: ${e.message ?: "Invalid expression"}"
                             result = ""
                         }
                     }
@@ -118,6 +171,7 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
                             "sin", "cos", "tan", "ln", "log", "√" -> "$button("
                             "π" -> "π"
                             "e" -> "e"
+                            "!" -> "!"
                             else -> button
                         }
                     }
@@ -135,6 +189,7 @@ fun CalculatorDisplay(
     input: String,
     result: String,
     errorMessage: String?,
+    showFraction: Boolean,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -317,121 +372,130 @@ fun CalculatorButton(
     }
 }
 
-// Calculation engine
-fun calculateExpression(expression: String): String {
-    if (expression.isEmpty()) return ""
+// New calculation engine using exp4j
+fun calculateExpression(expression: String, isDegreeMode: Boolean): Double {
+    if (expression.isEmpty()) return 0.0
     
     try {
-        // Replace mathematical symbols with their values
-        var expr = expression.replace("π", Math.PI.toString())
-                             .replace("e", Math.E.toString())
+        // Replace mathematical symbols and handle factorial
+        var processedExpr = expression
+            .replace("×", "*")
+            .replace("÷", "/")
+            .replace("π", "PI")
+            .replace("e", "E")
+            .replace("√(", "sqrt(")
         
-        // Handle scientific functions
-        expr = evaluateScientificFunctions(expr)
+        // Handle factorial operator
+        val factorialRegex = "(\\d+)!".toRegex()
+        while (factorialRegex.containsMatchIn(processedExpr)) {
+            processedExpr = processedExpr.replace(factorialRegex) { matchResult ->
+                val number = matchResult.groupValues[1].toInt()
+                factorial(number).toString()
+            }
+        }
         
-        // Calculate basic operations
-        val result = evaluateBasicOperations(expr)
+        // Create expression builder
+        val expressionBuilder = ExpressionBuilder(processedExpr)
         
-        // Format result to avoid unnecessary decimal places
-        return if (result == result.toLong().toDouble()) {
-            result.toLong().toString()
+        // Add variables
+        expressionBuilder.variable("PI")
+                        .variable("E")
+        
+        // Create custom functions with degree/radian handling
+        if (isDegreeMode) {
+            expressionBuilder.function(object : net.objecthunter.exp4j.function.Function("sin", 1) {
+                override fun apply(args: DoubleArray): Double = sin(Math.toRadians(args[0]))
+            })
+            expressionBuilder.function(object : net.objecthunter.exp4j.function.Function("cos", 1) {
+                override fun apply(args: DoubleArray): Double = cos(Math.toRadians(args[0]))
+            })
+            expressionBuilder.function(object : net.objecthunter.exp4j.function.Function("tan", 1) {
+                override fun apply(args: DoubleArray): Double = tan(Math.toRadians(args[0]))
+            })
         } else {
-            result.toString()
+            expressionBuilder.function(object : net.objecthunter.exp4j.function.Function("sin", 1) {
+                override fun apply(args: DoubleArray): Double = sin(args[0])
+            })
+            expressionBuilder.function(object : net.objecthunter.exp4j.function.Function("cos", 1) {
+                override fun apply(args: DoubleArray): Double = cos(args[0])
+            })
+            expressionBuilder.function(object : net.objecthunter.exp4j.function.Function("tan", 1) {
+                override fun apply(args: DoubleArray): Double = tan(args[0])
+            })
         }
+        
+        // Add additional functions
+        expressionBuilder.function(object : net.objecthunter.exp4j.function.Function("sinh", 1) {
+            override fun apply(args: DoubleArray): Double = sinh(args[0])
+        })
+        expressionBuilder.function(object : net.objecthunter.exp4j.function.Function("cosh", 1) {
+            override fun apply(args: DoubleArray): Double = cosh(args[0])
+        })
+        expressionBuilder.function(object : net.objecthunter.exp4j.function.Function("tanh", 1) {
+            override fun apply(args: DoubleArray): Double = tanh(args[0])
+        })
+        expressionBuilder.function(object : net.objecthunter.exp4j.function.Function("ln", 1) {
+            override fun apply(args: DoubleArray): Double = ln(args[0])
+        })
+        expressionBuilder.function(object : net.objecthunter.exp4j.function.Function("log", 1) {
+            override fun apply(args: DoubleArray): Double = log10(args[0])
+        })
+        expressionBuilder.function(object : net.objecthunter.exp4j.function.Function("sqrt", 1) {
+            override fun apply(args: DoubleArray): Double = sqrt(args[0])
+        })
+            
+        // Build the expression
+        val expression = expressionBuilder.build()
+        
+        // Set variable values
+        expression.setVariable("PI", Math.PI)
+        expression.setVariable("E", Math.E)
+        
+        // Evaluate
+        val result = expression.evaluate()
+        
+        return result
+    } catch (e: ArithmeticException) {
+        throw ArithmeticException("Division by zero")
     } catch (e: Exception) {
-        throw RuntimeException("Invalid expression")
+        throw RuntimeException("Invalid expression: ${e.message}")
     }
 }
 
-// Evaluate scientific functions like sin, cos, etc.
-fun evaluateScientificFunctions(expression: String): String {
-    var expr = expression
-    
-    // Pattern to find function calls like sin(x), log(x), etc.
-    val functionRegex = "(sin|cos|tan|ln|log|sqrt|√)\\((.*?)\\)".toRegex()
-    while (functionRegex.containsMatchIn(expr)) {
-        expr = expr.replace(functionRegex) { matchResult ->
-            val function = matchResult.groupValues[1]
-            val argument = evaluateBasicOperations(matchResult.groupValues[2])
-            
-            when (function) {
-                "sin" -> sin(Math.toRadians(argument)).toString()
-                "cos" -> cos(Math.toRadians(argument)).toString()
-                "tan" -> tan(Math.toRadians(argument)).toString()
-                "ln" -> ln(argument).toString()
-                "log" -> log10(argument).toString()
-                "sqrt", "√" -> sqrt(argument).toString()
-                else -> argument.toString()
-            }
-        }
+// Factorial implementation (for integers)
+fun factorial(n: Int): Double {
+    if (n < 0) throw IllegalArgumentException("Negative factorial not defined")
+    var result = 1.0
+    for (i in 2..n) {
+        result *= i
     }
-    
-    return expr
+    return result
 }
 
-// Basic operation evaluation using a simple recursive descent parser
-fun evaluateBasicOperations(expression: String): Double {
-    // Parse expression and compute result
-    // This is a simplified implementation. In a real app, use a proper expression parser.
-    // For demonstration purposes, we'll implement a basic evaluator
-    
-    // Handle parentheses first
-    val parenRegex = "\\(([^()]+)\\)".toRegex()
-    var expr = expression
-    while (parenRegex.containsMatchIn(expr)) {
-        expr = expr.replace(parenRegex) { matchResult ->
-            evaluateBasicOperations(matchResult.groupValues[1]).toString()
-        }
+// Format result based on fraction/decimal mode
+fun formatResult(value: Double, showFraction: Boolean): String {
+    // For integer results, show without decimal point
+    if (value == value.toLong().toDouble()) {
+        return value.toLong().toString()
     }
     
-    // Evaluate addition and subtraction
-    val parts = expr.split("""(?<=\d)([+\-])(?=\d)""".toRegex())
-    if (parts.size > 1) {
-        var result = evaluateMultiplicationDivision(parts[0])
-        
-        for (i in 1 until parts.size step 2) {
-            val operator = parts[i]
-            val operand = evaluateMultiplicationDivision(parts[i + 1])
-            
-            when (operator) {
-                "+" -> result += operand
-                "-" -> result -= operand
+    // For fraction mode
+    if (showFraction) {
+        try {
+            // Create a new fraction from the double value
+            // Using epsilon and max iterations for better accuracy
+            val fraction = Fraction(value, 1.0E-10, 100)
+            // Only show as fraction if denominator is reasonable
+            if (fraction.denominator < 10000) {
+                return "${fraction.numerator}/${fraction.denominator}"
             }
+        } catch (e: Exception) {
+            // Fall back to decimal if fraction conversion fails
         }
-        
-        return result
     }
     
-    // If no addition/subtraction, evaluate multiplication/division
-    return evaluateMultiplicationDivision(expr)
-}
-
-// Helper function to evaluate multiplication and division
-fun evaluateMultiplicationDivision(expression: String): Double {
-    val parts = expression.split("""(?<=\d)([*/^%])(?=\d)""".toRegex())
-    if (parts.size > 1) {
-        var result = parts[0].toDouble()
-        
-        for (i in 1 until parts.size step 2) {
-            val operator = parts[i]
-            val operand = parts[i + 1].toDouble()
-            
-            when (operator) {
-                "*" -> result *= operand
-                "/" -> {
-                    if (operand == 0.0) throw ArithmeticException("Division by zero")
-                    result /= operand
-                }
-                "^" -> result = result.pow(operand)
-                "%" -> result %= operand
-            }
-        }
-        
-        return result
-    }
-    
-    // If no operations, convert to double
-    return expression.toDouble()
+    // Default to decimal format
+    return value.toString()
 }
 
 @Preview(showBackground = true)
