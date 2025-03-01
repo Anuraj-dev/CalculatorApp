@@ -1,0 +1,7 @@
+dependencies {
+    // Expression evaluation library
+    implementation 'net.objecthunter:exp4j:0.4.8'
+    
+    // Apache Commons Math for fraction support
+    implementation 'org.apache.commons:commons-math3:3.6.1'
+}
