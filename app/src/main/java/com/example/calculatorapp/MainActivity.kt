@@ -58,11 +58,19 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
     // State management
     var input by remember { mutableStateOf("") }
     var result by remember { mutableStateOf("") }
+    var rawResult by remember { mutableStateOf<Double?>(null) } // Store the raw numeric result
     var showScientific by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isDegreeMode by remember { mutableStateOf(true) }
     var showFraction by remember { mutableStateOf(false) }
     var calculationHistory by remember { mutableStateOf(listOf<Pair<String, String>>()) }
+    
+    // Effect to update result format when fraction mode changes
+    LaunchedEffect(showFraction, rawResult) {
+        if (rawResult != null) {
+            result = formatResult(rawResult!!, showFraction)
+        }
+    }
 
     // UI Components
     Column(
@@ -140,8 +148,8 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
                 when (button) {
                     "=" -> {
                         try {
-                            val calculatedResult = calculateExpression(input, isDegreeMode)
-                            result = formatResult(calculatedResult, showFraction)
+                            rawResult = calculateExpression(input, isDegreeMode) // Store raw result
+                            result = formatResult(rawResult!!, showFraction)
                             // Add to history
                             if (input.isNotEmpty()) {
                                 calculationHistory = calculationHistory + Pair(input, result)
@@ -150,14 +158,17 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
                         } catch (e: ArithmeticException) {
                             errorMessage = "Error: Division by zero"
                             result = ""
+                            rawResult = null
                         } catch (e: Exception) {
                             errorMessage = "Error: ${e.message ?: "Invalid expression"}"
                             result = ""
+                            rawResult = null
                         }
                     }
                     "C" -> {
                         input = ""
                         result = ""
+                        rawResult = null
                         errorMessage = null
                     }
                     "⌫" -> {
