@@ -64,6 +64,8 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
     var isDegreeMode by remember { mutableStateOf(true) }
     var showFraction by remember { mutableStateOf(false) }
     var calculationHistory by remember { mutableStateOf(listOf<Pair<String, String>>()) }
+    // Add flag to track when the last action was equals
+    var lastActionWasEquals by remember { mutableStateOf(false) }
     
     // Effect to update result format when fraction mode changes
     LaunchedEffect(showFraction, rawResult) {
@@ -155,14 +157,17 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
                                 calculationHistory = calculationHistory + Pair(input, result)
                             }
                             errorMessage = null
+                            lastActionWasEquals = true // Set flag when equals is pressed
                         } catch (e: ArithmeticException) {
                             errorMessage = "Error: Division by zero"
                             result = ""
                             rawResult = null
+                            lastActionWasEquals = false
                         } catch (e: Exception) {
                             errorMessage = "Error: ${e.message ?: "Invalid expression"}"
                             result = ""
                             rawResult = null
+                            lastActionWasEquals = false
                         }
                     }
                     "C" -> {
@@ -170,20 +175,45 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
                         result = ""
                         rawResult = null
                         errorMessage = null
+                        lastActionWasEquals = false // Reset flag
                     }
                     "⌫" -> {
                         if (input.isNotEmpty()) {
                             input = input.dropLast(1)
                         }
                     }
+                    // Check if the button is an operation
+                    "+", "-", "*", "/", "^", "%" -> {
+                        if (lastActionWasEquals && result.isNotEmpty()) {
+                            // Use previous result as input for the next calculation
+                            input = result + button
+                            lastActionWasEquals = false
+                        } else {
+                            input += button
+                        }
+                    }
                     else -> {
-                        // Handle special functions
-                        input += when (button) {
-                            "sin", "cos", "tan", "ln", "log", "√" -> "$button("
-                            "π" -> "π"
-                            "e" -> "e"
-                            "!" -> "!"
-                            else -> button
+                        // Check if we should start a new calculation
+                        if (lastActionWasEquals) {
+                            // If last action was equals and we're entering a new number,
+                            // clear the input and start fresh
+                            input = when (button) {
+                                "sin", "cos", "tan", "ln", "log", "√" -> "$button("
+                                "π" -> "π"
+                                "e" -> "e"
+                                "!" -> "!"
+                                else -> button
+                            }
+                            lastActionWasEquals = false
+                        } else {
+                            // Handle special functions
+                            input += when (button) {
+                                "sin", "cos", "tan", "ln", "log", "√" -> "$button("
+                                "π" -> "π"
+                                "e" -> "e"
+                                "!" -> "!"
+                                else -> button
+                            }
                         }
                     }
                 }
