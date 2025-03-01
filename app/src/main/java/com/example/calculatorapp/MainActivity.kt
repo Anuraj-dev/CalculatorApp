@@ -35,6 +35,11 @@ import kotlin.math.*
 import net.objecthunter.exp4j.ExpressionBuilder
 import net.objecthunter.exp4j.operator.Operator
 import org.apache.commons.math3.fraction.Fraction
+import com.example.calculatorapp.model.CalculatorModel
+import com.example.calculatorapp.ui.ConstantsLibraryDialog
+import com.example.calculatorapp.ui.UnitConverterDialog
+import com.example.calculatorapp.utils.AdvancedMath
+import com.example.calculatorapp.utils.ScientificConstants
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,6 +71,12 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
     var calculationHistory by remember { mutableStateOf(listOf<Pair<String, String>>()) }
     // Add flag to track when the last action was equals
     var lastActionWasEquals by remember { mutableStateOf(false) }
+    val calculatorModel = remember { CalculatorModel() }
+
+    // Dialog visibility states
+    var showUnitConverter by remember { mutableStateOf(false) }
+    var showConstantsLibrary by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
     
     // Effect to update result format when fraction mode changes
     LaunchedEffect(showFraction, rawResult) {
@@ -81,6 +92,20 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // Memory indicator (if memory has a value)
+        AnimatedVisibility(visible = calculatorModel.memory != 0.0) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Text(
+                    text = "M = ${calculatorModel.memory}",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
         // Calculator display
         CalculatorDisplay(
             input = input,
@@ -91,6 +116,81 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
                 .fillMaxWidth()
                 .weight(1f)
         )
+
+        // Function buttons row (unit converter, constants, history)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Button(
+                onClick = { showUnitConverter = true },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            ) {
+                Text("Units")
+            }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Button(
+                onClick = { showConstantsLibrary = true },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            ) {
+                Text("Constants")
+            }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            Button(
+                onClick = { showHistory = true },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            ) {
+                Text("History")
+            }
+        }
+
+        // Memory function buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            listOf("MC", "MR", "M+", "M-").forEach { memOp ->
+                CalculatorButton(
+                    text = memOp,
+                    onClick = {
+                        when (memOp) {
+                            "MC" -> calculatorModel.memoryClear()
+                            "MR" -> {
+                                if (calculatorModel.memory != 0.0) {
+                                    // Use memory value in calculation
+                                    if (lastActionWasEquals) {
+                                        input = calculatorModel.memory.toString()
+                                    } else {
+                                        input += calculatorModel.memory.toString()
+                                    }
+                                }
+                            }
+                            "M+" -> calculatorModel.memoryAdd(rawResult ?: 0.0)
+                            "M-" -> calculatorModel.memorySubtract(rawResult ?: 0.0)
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    buttonColor = MaterialTheme.colorScheme.secondaryContainer,
+                    textColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
 
         // Toggles row
         Row(
