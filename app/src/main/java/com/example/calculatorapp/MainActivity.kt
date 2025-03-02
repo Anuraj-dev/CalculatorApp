@@ -108,11 +108,18 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
         )
     }
     
-    if (showHistory) {
+        if (showHistory) {
         HistoryDialog(
             history = calculatorModel.calculationHistory,
             onDismiss = { showHistory = false },
-            onClearHistory = { calculatorModel.clearHistory() },
+            onClearHistory = {
+                calculatorModel.clearHistory()
+                // Clear the input, result, and rawResult states
+                input = ""
+                result = ""
+                rawResult = null
+                showHistory = false
+            },
             onSelectCalculation = { expr, res ->
                 input = expr
                 result = res
@@ -331,6 +338,9 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
                         if (lastActionWasEquals && result.isNotEmpty()) {
                             // Use previous result as input for the next calculation
                             input = result + button
+                            // Clear the result display when starting a new calculation
+                            result = ""
+                            rawResult = null
                             lastActionWasEquals = false
                         } else {
                             input += button
@@ -348,6 +358,9 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
                                 "!" -> "!"
                                 else -> button
                             }
+                            // Clear the result display
+                            result = ""
+                            rawResult = null
                             lastActionWasEquals = false
                         } else {
                             // Handle special functions
