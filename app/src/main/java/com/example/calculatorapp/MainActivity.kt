@@ -351,7 +351,12 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
                             rawResult = null
                             lastActionWasEquals = false
                         } else {
-                            input += button
+                            // Check if the last character is already an operator, replace it
+                            if (input.isNotEmpty() && "+-*/^%".contains(input.last().toString())) {
+                                input = input.substring(0, input.length - 1) + button
+                            } else {
+                                input += button
+                            }
                         }
                     }
                     else -> {
@@ -441,7 +446,7 @@ fun CalculatorDisplay(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Result with animated content transition
+            // Result with animated content transition and adaptive font size
             AnimatedContent(
                 targetState = result,
                 transitionSpec = {
@@ -450,9 +455,17 @@ fun CalculatorDisplay(
                 },
                 label = "Result Animation"
             ) { targetResult ->
+                // Adaptive text that changes font size based on content length
+                val fontSize = when {
+                    targetResult.length > 20 -> 28.sp
+                    targetResult.length > 15 -> 36.sp
+                    targetResult.length > 10 -> 42.sp
+                    else -> 48.sp
+                }
+                
                 Text(
                     text = targetResult,
-                    fontSize = 48.sp,
+                    fontSize = fontSize,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.End,
@@ -471,12 +484,13 @@ fun CalculatorKeypad(
     onButtonClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Rearrange the basic buttons to put equals last
     val basicButtons = listOf(
         listOf("C", "⌫", "(", ")", "÷"),
         listOf("7", "8", "9", "×", "^"),
         listOf("4", "5", "6", "-", "√"),
-        listOf("1", "2", "3", "+", "="),
-        listOf("0", ".", "π", "e", "%")
+        listOf("1", "2", "3", "+", "%"),
+        listOf("0", ".", "π", "e", "=")
     )
 
     val scientificButtons = listOf(
@@ -485,10 +499,15 @@ fun CalculatorKeypad(
         "sinh", "cosh", "tanh"
     )
 
-    Column(modifier = modifier) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         // Scientific buttons row (conditionally visible)
         AnimatedVisibility(visible = showScientific) {
-            Column {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 // Display scientific buttons in a 3x3 grid
                 for (i in 0 until 3) {
                     Row(
@@ -514,16 +533,11 @@ fun CalculatorKeypad(
         }
 
         // Basic numeric and operation buttons
-        Column(
-            verticalArrangement = Arrangement.SpaceEvenly,
-            modifier = Modifier.fillMaxHeight()
-        ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             basicButtons.forEach { row ->
                 Row(
                     horizontalArrangement = Arrangement.SpaceEvenly,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     row.forEach { buttonText ->
                         CalculatorButton(
@@ -533,13 +547,13 @@ fun CalculatorKeypad(
                             buttonColor = when (buttonText) {
                                 "C", "⌫" -> MaterialTheme.colorScheme.errorContainer
                                 "+", "-", "×", "÷", "^", "√", "%" -> MaterialTheme.colorScheme.secondaryContainer
-                                "=" -> MaterialTheme.colorScheme.primaryContainer
+                                "=" -> MaterialTheme.colorScheme.primary // Make equals button darker
                                 else -> MaterialTheme.colorScheme.surfaceVariant
                             },
                             textColor = when (buttonText) {
                                 "C", "⌫" -> MaterialTheme.colorScheme.onErrorContainer
                                 "+", "-", "×", "÷", "^", "√", "%" -> MaterialTheme.colorScheme.onSecondaryContainer
-                                "=" -> MaterialTheme.colorScheme.onPrimaryContainer
+                                "=" -> MaterialTheme.colorScheme.onPrimary // Text color for equals
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
                         )
@@ -692,7 +706,7 @@ fun factorial(n: Int): Double {
     return result
 }
 
-// Format result based on fraction/decimal mode
+// Format result based on fraction/decimal mode with rounding for very long decimals
 fun formatResult(value: Double, showFraction: Boolean): String {
     // For integer results, show without decimal point
     if (value == value.toLong().toDouble()) {
@@ -714,8 +728,21 @@ fun formatResult(value: Double, showFraction: Boolean): String {
         }
     }
     
-    // Default to decimal format
-    return value.toString()
+    // Default to decimal format, with rounding for very long decimals
+    val resultStr = value.toString()
+    
+    // Check if the result is too long and contains a decimal part
+    if (resultStr.length > 15 && resultStr.contains('.')) {
+        // Find a suitable precision that keeps the result under 15 chars
+        val decimalIndex = resultStr.indexOf('.')
+        val integerPartLength = decimalIndex
+        val maxDecimalPlaces = 15 - integerPartLength - 1 // -1 for the decimal point
+        
+        // Round to appropriate decimal places
+        return "%.${maxDecimalPlaces}f".format(value)
+    }
+    
+    return resultStr
 }
 
 @Preview(showBackground = true)
