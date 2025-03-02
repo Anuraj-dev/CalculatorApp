@@ -42,6 +42,17 @@ import com.example.calculatorapp.utils.AdvancedMath
 import com.example.calculatorapp.utils.ScientificConstants
 import com.example.calculatorapp.ui.HistoryDialog
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.with
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,6 +70,7 @@ class MainActivity : ComponentActivity() {
 }
 
 // Main calculator composable
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun CalculatorApp(modifier: Modifier = Modifier) {
     // State management
@@ -309,13 +321,9 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
                             }
                             errorMessage = null
                             lastActionWasEquals = true // Set flag when equals is pressed
-                        } catch (e: ArithmeticException) {
-                            errorMessage = "Error: Division by zero"
-                            result = ""
-                            rawResult = null
-                            lastActionWasEquals = false
                         } catch (e: Exception) {
-                            errorMessage = "Error: ${e.message ?: "Invalid expression"}"
+                            // Simplified error message for all error cases
+                            errorMessage = "Error"
                             result = ""
                             rawResult = null
                             lastActionWasEquals = false
@@ -382,6 +390,7 @@ fun CalculatorApp(modifier: Modifier = Modifier) {
     }
 }
 
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun CalculatorDisplay(
     input: String,
@@ -400,8 +409,12 @@ fun CalculatorDisplay(
         Column(
             horizontalAlignment = Alignment.End
         ) {
-            // Error message if present
-            AnimatedVisibility(visible = errorMessage != null) {
+            // Error message with animated visibility
+            AnimatedVisibility(
+                visible = errorMessage != null,
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically()
+            ) {
                 Text(
                     text = errorMessage ?: "",
                     color = MaterialTheme.colorScheme.error,
@@ -428,17 +441,26 @@ fun CalculatorDisplay(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Result
-            Text(
-                text = result,
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.End,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth()
-            )
+            // Result with animated content transition
+            AnimatedContent(
+                targetState = result,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(300, easing = FastOutSlowInEasing)) with
+                    fadeOut(animationSpec = tween(150, easing = LinearEasing))
+                },
+                label = "Result Animation"
+            ) { targetResult ->
+                Text(
+                    text = targetResult,
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }
