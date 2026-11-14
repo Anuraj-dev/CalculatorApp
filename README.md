@@ -48,3 +48,7 @@ The unit and instrumented tests are still the Android Studio placeholders. They 
 `MainActivity.kt` holds the keypad, the display and the evaluation. Before exp4j parses an expression, `calculateExpression` rewrites `×`, `÷`, `π`, `e` and `√(` into exp4j syntax. It also expands `n!` for integer literals. The trig functions are registered for the current angle mode. `formatResult` then picks integer, fraction or decimal output.
 
 `model/CalculatorModel.kt` stores memory and the history. `utils/MathUtils.kt` holds the constants and the unit tables. It also holds `AdvancedMath`, which has permutations, combinations, gamma, base conversion, GCD and LCM. No screen calls `AdvancedMath` yet.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
